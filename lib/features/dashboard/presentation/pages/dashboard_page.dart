@@ -8,19 +8,22 @@ import '../../../../shared/widgets/page_header.dart';
 import '../../../../shared/widgets/section_card.dart';
 import '../../../../shared/widgets/stat_card.dart';
 import '../../../../shared/widgets/status_badge.dart';
+import '../../../auth/presentation/widgets/auth_scope.dart';
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final user = AuthScope.of(context).user!;
+
     return AppShell(
       currentRoute: AppRoutes.dashboard,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           PageHeader(
-            title: 'Olá, Gustavo',
+            title: 'Olá, ${user.name}',
             subtitle: 'Acompanhe as melhorias da sua equipe.',
             trailing: FilledButton.icon(
               onPressed: () =>

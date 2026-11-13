@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../app/app_routes.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../core/theme/app_colors.dart';
+import '../../features/auth/domain/app_user.dart';
+import '../../features/auth/presentation/widgets/auth_scope.dart';
 
 class AppShell extends StatelessWidget {
   const AppShell({
@@ -46,6 +48,9 @@ class AppShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final authController = AuthScope.of(context);
+    final user = authController.user!;
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final desktop = constraints.maxWidth >= 980;
@@ -57,11 +62,16 @@ class AppShell extends StatelessWidget {
                 _Sidebar(
                   currentRoute: currentRoute,
                   destinations: _destinations,
+                  user: user,
                 ),
                 Expanded(
                   child: Column(
                     children: [
-                      _TopBar(actions: actions),
+                      _TopBar(
+                        actions: actions,
+                        user: user,
+                        onSignOut: authController.signOut,
+                      ),
                       Expanded(
                         child: SingleChildScrollView(
                           padding: const EdgeInsets.all(AppSpacing.xl),
@@ -83,7 +93,14 @@ class AppShell extends StatelessWidget {
           appBar: AppBar(
             backgroundColor: AppColors.surface,
             title: const _Brand(compact: true),
-            actions: actions,
+            actions: [
+              ...actions,
+              IconButton(
+                tooltip: 'Sair',
+                onPressed: authController.signOut,
+                icon: const Icon(Icons.logout_rounded),
+              ),
+            ],
           ),
           drawer: Drawer(
             backgroundColor: AppColors.sidebar,
@@ -105,9 +122,15 @@ class AppShell extends StatelessWidget {
 }
 
 class _TopBar extends StatelessWidget {
-  const _TopBar({required this.actions});
+  const _TopBar({
+    required this.actions,
+    required this.user,
+    required this.onSignOut,
+  });
 
   final List<Widget> actions;
+  final AppUser user;
+  final Future<void> Function() onSignOut;
 
   @override
   Widget build(BuildContext context) {
@@ -123,16 +146,17 @@ class _TopBar extends StatelessWidget {
           const Spacer(),
           ...actions,
           const SizedBox(width: AppSpacing.sm),
-          const IconButton(
-            onPressed: null,
-            icon: Icon(Icons.notifications_none_rounded),
+          IconButton(
+            tooltip: 'Sair',
+            onPressed: onSignOut,
+            icon: const Icon(Icons.logout_rounded),
           ),
-          const CircleAvatar(
+          CircleAvatar(
             radius: 18,
             backgroundColor: AppColors.infoSoft,
             child: Text(
-              'GP',
-              style: TextStyle(
+              user.initials,
+              style: const TextStyle(
                 color: AppColors.primary,
                 fontWeight: FontWeight.w700,
               ),
@@ -148,10 +172,12 @@ class _Sidebar extends StatelessWidget {
   const _Sidebar({
     required this.currentRoute,
     required this.destinations,
+    required this.user,
   });
 
   final String currentRoute;
   final List<_NavigationItem> destinations;
+  final AppUser user;
 
   @override
   Widget build(BuildContext context) {
@@ -173,7 +199,7 @@ class _Sidebar extends StatelessWidget {
               destinations: destinations,
             ),
           ),
-          const _ProfileSummary(),
+          _ProfileSummary(user: user),
         ],
       ),
     );
@@ -253,37 +279,46 @@ class _Brand extends StatelessWidget {
 }
 
 class _ProfileSummary extends StatelessWidget {
-  const _ProfileSummary();
+  const _ProfileSummary({required this.user});
+
+  final AppUser user;
 
   @override
   Widget build(BuildContext context) {
-    return const Row(
+    return Row(
       children: [
         CircleAvatar(
           backgroundColor: AppColors.infoSoft,
           child: Text(
-            'GP',
-            style: TextStyle(
+            user.initials,
+            style: const TextStyle(
               color: AppColors.primary,
               fontWeight: FontWeight.w700,
             ),
           ),
         ),
-        SizedBox(width: 12),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Gustavo',
-                style: TextStyle(
+                user.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w600,
                 ),
               ),
               Text(
-                'Desenvolvedor',
-                style: TextStyle(color: Color(0xFF9EA0B8), fontSize: 12),
+                user.email,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFF9EA0B8),
+                  fontSize: 12,
+                ),
               ),
             ],
           ),

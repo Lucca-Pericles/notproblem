@@ -1,8 +1,8 @@
 # Agile Knowledge — esqueleto Flutter
 
-Estrutura visual inicial do Agile Knowledge. O projeto contém telas estáticas,
-tema, navegação e componentes reutilizáveis, sem back-end, autenticação,
-persistência ou regras de negócio.
+Base inicial do Agile Knowledge com telas, tema, navegação, componentes
+reutilizáveis, autenticação com Supabase, rotas privadas e a estrutura inicial
+do banco de dados.
 
 ## Telas incluídas
 
@@ -38,11 +38,41 @@ pastas de plataforma não foram geradas. Em um computador com Flutter instalado:
 ```bash
 flutter create .
 flutter pub get
-flutter run
+Copy-Item config/dev.example.json config/dev.json
+flutter run --dart-define-from-file=config/dev.json
 ```
 
 O comando `flutter create .` adiciona Android, iOS, Web, Windows, macOS e Linux
 sem substituir a pasta `lib`.
+
+## Configurar autenticação e banco
+
+1. Crie um projeto gratuito no Supabase.
+2. Copie `config/dev.example.json` para `config/dev.json` e preencha a URL e a
+   chave publicável do projeto. O arquivo real fica ignorado pelo Git.
+3. Execute `supabase/migrations/202611130001_initial_auth.sql` no SQL Editor do
+   Supabase ou aplique a migração pela CLI.
+4. Inicie o app com `--dart-define-from-file=config/dev.json`.
+
+Para publicar a versão Web, use a mesma estratégia com um arquivo de produção
+fora do Git:
+
+```bash
+flutter build web --dart-define-from-file=config/prod.json
+```
+
+O aplicativo nunca recebe nem armazena hashes de senha. O Supabase Auth faz o
+processamento no servidor; o banco público mantém somente o perfil do usuário.
+As políticas RLS garantem que cada usuário leia e altere apenas o próprio perfil.
+
+## Fluxo entregue
+
+- cadastro com nome, e-mail e senha validada;
+- login, persistência de sessão e logout;
+- redirecionamento de rotas privadas para a tela de entrada;
+- página inicial personalizada com o nome autenticado;
+- credenciais de ambiente fora do código-fonte;
+- mensagens de erro sem registrar senha ou outros dados sensíveis.
 
 ## Próximos passos sugeridos
 

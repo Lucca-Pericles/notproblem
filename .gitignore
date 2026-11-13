@@ -13,3 +13,5 @@ macos/Pods/
 *.iml
 .idea/
 .vscode/
+config/*.json
+!config/*.example.json
