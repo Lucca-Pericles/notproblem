@@ -27,6 +27,6 @@
 - [x] Implementação e testes adicionados à branch da história.
 - [x] Critérios de aceite cobertos por teste ou roteiro manual.
 - [x] Nenhum dado sensível incluído no código ou em logs.
-- [ ] Revisão por outro integrante.
-- [ ] Migração aplicada e fluxo demonstrado no ambiente publicado.
-- [ ] Merge realizado após a aprovação da revisão.
+- [X] Revisão por outro integrante.
+- [X] Migração aplicada e fluxo demonstrado no ambiente publicado.
+- [X] Merge realizado após a aprovação da revisão.
