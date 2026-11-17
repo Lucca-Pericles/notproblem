@@ -187,7 +187,7 @@ class _NewOccurrencePageState extends State<NewOccurrencePage> {
                   ]));
       if (mounted)
         Navigator.of(context).pushReplacementNamed(AppRoutes.occurrenceDetail,
-            arguments: occurrence);
+            arguments: occurrence.id);
     } catch (_) {
       if (mounted)
         setState(() =>

@@ -289,6 +289,7 @@ class FakeAuthRepository implements AuthRepository {
 
 class FakeOccurrenceRepository implements OccurrenceRepository {
   Occurrence? lastCreated;
+  final List<Occurrence> items = [];
 
   @override
   Future<Occurrence> create(NewOccurrence occurrence) async {
@@ -301,6 +302,37 @@ class FakeOccurrenceRepository implements OccurrenceRepository {
       impact: occurrence.impact.trim(),
       status: OccurrenceStatus.registered,
     );
+    items.add(lastCreated!);
     return lastCreated!;
+  }
+
+  @override
+  Future<Occurrence?> getById(String id) async {
+    for (final item in items) {
+      if (item.id == id) return item;
+    }
+    return null;
+  }
+
+  @override
+  Future<List<Occurrence>> listMine() async => items;
+
+  @override
+  Future<Occurrence> updateContext(String id, String context) async {
+    final item = await getById(id);
+    if (item == null || item.status == OccurrenceStatus.completed) {
+      throw StateError('not found');
+    }
+    final updated = Occurrence(
+      id: item.id,
+      title: item.title,
+      project: item.project,
+      occurredOn: item.occurredOn,
+      context: context.trim(),
+      impact: item.impact,
+      status: item.status,
+    );
+    items[items.indexWhere((item) => item.id == id)] = updated;
+    return updated;
   }
 }

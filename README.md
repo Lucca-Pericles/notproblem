@@ -87,6 +87,7 @@ As políticas RLS garantem que cada usuário leia e altere apenas o próprio per
 ## Fluxo entregue
 
 - cadastro com nome, e-mail e senha validada;
+- registro, consulta e detalhe de ocorrências vinculadas à conta autenticada;
 - login, persistência de sessão e logout;
 - redirecionamento de rotas privadas para a tela de entrada;
 - página inicial personalizada com o nome autenticado;

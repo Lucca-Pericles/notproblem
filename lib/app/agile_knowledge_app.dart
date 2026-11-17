@@ -113,12 +113,14 @@ class _AgileKnowledgeAppState extends State<AgileKnowledgeApp> {
 
     final privatePage = switch (settings.name) {
       AppRoutes.dashboard => const DashboardPage(),
-      AppRoutes.occurrences => const OccurrencesPage(),
+      AppRoutes.occurrences =>
+        OccurrencesPage(repository: _occurrenceRepository),
       AppRoutes.newOccurrence => NewOccurrencePage(
           repository: _occurrenceRepository,
         ),
       AppRoutes.occurrenceDetail => OccurrenceDetailPage(
-          occurrence: settings.arguments! as Occurrence,
+          occurrenceId: settings.arguments as String? ?? '',
+          repository: _occurrenceRepository,
         ),
       AppRoutes.investigations => const InvestigationPage(),
       AppRoutes.actions => const ActionFollowUpPage(),

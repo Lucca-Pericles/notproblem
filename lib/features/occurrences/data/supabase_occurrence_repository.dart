@@ -25,6 +25,39 @@ class SupabaseOccurrenceRepository implements OccurrenceRepository {
     return _fromRow(row);
   }
 
+  @override
+  Future<List<Occurrence>> listMine() async {
+    final rows = await _client
+        .from('occurrences')
+        .select()
+        .order('occurred_on', ascending: false)
+        .order('created_at', ascending: false);
+    return rows.map(_fromRow).toList();
+  }
+
+  @override
+  Future<Occurrence?> getById(String id) async {
+    final row =
+        await _client.from('occurrences').select().eq('id', id).maybeSingle();
+    return row == null ? null : _fromRow(row);
+  }
+
+  @override
+  Future<Occurrence> updateContext(String id, String context) async {
+    final value = context.trim();
+    if (value.length < 2 || value.length > 4000) {
+      throw ArgumentError('Contexto inválido');
+    }
+    final row = await _client
+        .from('occurrences')
+        .update({'context': value})
+        .eq('id', id)
+        .select()
+        .maybeSingle();
+    if (row == null) throw StateError('Ocorrência não pode ser atualizada');
+    return _fromRow(row);
+  }
+
   Occurrence _fromRow(Map<String, dynamic> row) => Occurrence(
         id: row['id'] as String,
         title: row['title'] as String,
