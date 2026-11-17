@@ -16,17 +16,23 @@ import '../features/dashboard/presentation/pages/dashboard_page.dart';
 import '../features/history/presentation/pages/history_page.dart';
 import '../features/investigations/presentation/pages/investigation_page.dart';
 import '../features/occurrences/presentation/pages/new_occurrence_page.dart';
+import '../features/occurrences/presentation/pages/occurrence_detail_page.dart';
 import '../features/occurrences/presentation/pages/occurrences_page.dart';
+import '../features/occurrences/data/supabase_occurrence_repository.dart';
+import '../features/occurrences/domain/occurrence.dart';
+import '../features/occurrences/domain/occurrence_repository.dart';
 import 'app_routes.dart';
 
 class AgileKnowledgeApp extends StatefulWidget {
   const AgileKnowledgeApp({
     this.authRepository,
+    this.occurrenceRepository,
     this.showEmailConfirmationNotification,
     super.key,
   });
 
   final AuthRepository? authRepository;
+  final OccurrenceRepository? occurrenceRepository;
   final bool? showEmailConfirmationNotification;
 
   @override
@@ -35,6 +41,7 @@ class AgileKnowledgeApp extends StatefulWidget {
 
 class _AgileKnowledgeAppState extends State<AgileKnowledgeApp> {
   AuthController? _authController;
+  OccurrenceRepository? _occurrenceRepository;
 
   @override
   void initState() {
@@ -43,10 +50,14 @@ class _AgileKnowledgeAppState extends State<AgileKnowledgeApp> {
     final repository = widget.authRepository;
     if (repository != null) {
       _authController = AuthController(repository);
+      _occurrenceRepository = widget.occurrenceRepository;
     } else if (AppConfig.hasSupabaseCredentials) {
       _authController = AuthController(
         SupabaseAuthRepository(Supabase.instance.client),
         emailConfirmationRedirectUrl: AppConfig.emailConfirmationRedirectUrl,
+      );
+      _occurrenceRepository = SupabaseOccurrenceRepository(
+        Supabase.instance.client,
       );
     }
   }
@@ -103,7 +114,12 @@ class _AgileKnowledgeAppState extends State<AgileKnowledgeApp> {
     final privatePage = switch (settings.name) {
       AppRoutes.dashboard => const DashboardPage(),
       AppRoutes.occurrences => const OccurrencesPage(),
-      AppRoutes.newOccurrence => const NewOccurrencePage(),
+      AppRoutes.newOccurrence => NewOccurrencePage(
+          repository: _occurrenceRepository,
+        ),
+      AppRoutes.occurrenceDetail => OccurrenceDetailPage(
+          occurrence: settings.arguments! as Occurrence,
+        ),
       AppRoutes.investigations => const InvestigationPage(),
       AppRoutes.actions => const ActionFollowUpPage(),
       AppRoutes.history => const HistoryPage(),

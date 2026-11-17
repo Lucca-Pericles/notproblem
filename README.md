@@ -50,8 +50,8 @@ sem substituir a pasta `lib`.
 1. Crie um projeto gratuito no Supabase.
 2. Copie `config/dev.example.json` para `config/dev.json` e preencha a URL e a
    chave publicável do projeto. O arquivo real fica ignorado pelo Git.
-3. Execute `supabase/migrations/202611130001_initial_auth.sql` no SQL Editor do
-   Supabase ou aplique a migração pela CLI.
+3. Execute, em ordem, os arquivos em `supabase/migrations/` no SQL Editor do
+   Supabase ou aplique as migrações pela CLI.
 4. Inicie o app com `--dart-define-from-file=config/dev.json`.
 
 Para publicar a versão Web, use a mesma estratégia com um arquivo de produção

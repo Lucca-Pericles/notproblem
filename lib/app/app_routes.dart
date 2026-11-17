@@ -5,6 +5,7 @@ abstract final class AppRoutes {
   static const emailConfirmed = '/email-confirmado';
   static const occurrences = '/occurrences';
   static const newOccurrence = '/occurrences/new';
+  static const occurrenceDetail = '/occurrences/detail';
   static const investigations = '/investigations';
   static const actions = '/actions';
   static const history = '/history';

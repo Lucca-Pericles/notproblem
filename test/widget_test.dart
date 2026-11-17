@@ -6,11 +6,14 @@ import 'package:agile_knowledge/features/auth/domain/app_user.dart';
 import 'package:agile_knowledge/features/auth/domain/auth_repository.dart';
 import 'package:agile_knowledge/features/auth/presentation/pages/sign_in_page.dart';
 import 'package:agile_knowledge/features/auth/presentation/pages/email_confirmed_page.dart';
+import 'package:agile_knowledge/features/occurrences/domain/occurrence.dart';
+import 'package:agile_knowledge/features/occurrences/domain/occurrence_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('usuário sem sessão visualiza a página de entrada', (tester) async {
+  testWidgets('usuário sem sessão visualiza a página de entrada',
+      (tester) async {
     await tester.pumpWidget(
       AgileKnowledgeApp(authRepository: FakeAuthRepository()),
     );
@@ -188,7 +191,8 @@ void main() {
     expect(find.byKey(const Key('signInEmail')), findsOneWidget);
   });
 
-  testWidgets('callback de confirmação exibe notificação para conta autenticada',
+  testWidgets(
+      'callback de confirmação exibe notificação para conta autenticada',
       (tester) async {
     await tester.pumpWidget(
       AgileKnowledgeApp(
@@ -210,6 +214,22 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Olá, Ana'), findsOneWidget);
+  });
+
+  test('ocorrência nova começa como Registrada', () async {
+    final occurrences = FakeOccurrenceRepository();
+    final occurrence = await occurrences.create(
+      NewOccurrence(
+        title: 'Corrigir API',
+        project: 'Sprint 17',
+        occurredOn: DateTime(2026, 11, 15),
+        context: 'Dependência indisponível',
+        impact: 'Entrega atrasada',
+      ),
+    );
+
+    expect(occurrence.status, OccurrenceStatus.registered);
+    expect(occurrence.title, 'Corrigir API');
   });
 }
 
@@ -264,5 +284,23 @@ class FakeAuthRepository implements AuthRepository {
   Future<void> signOut() async {
     _currentUser = null;
     _controller.add(null);
+  }
+}
+
+class FakeOccurrenceRepository implements OccurrenceRepository {
+  Occurrence? lastCreated;
+
+  @override
+  Future<Occurrence> create(NewOccurrence occurrence) async {
+    lastCreated = Occurrence(
+      id: 'occurrence-1',
+      title: occurrence.title.trim(),
+      project: occurrence.project.trim(),
+      occurredOn: occurrence.occurredOn,
+      context: occurrence.context.trim(),
+      impact: occurrence.impact.trim(),
+      status: OccurrenceStatus.registered,
+    );
+    return lastCreated!;
   }
 }
