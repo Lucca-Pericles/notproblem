@@ -1,4 +1,5 @@
 {
   "SUPABASE_URL": "https://seu-projeto.supabase.co",
-  "SUPABASE_PUBLISHABLE_KEY": "sua-chave-publicavel"
+  "SUPABASE_PUBLISHABLE_KEY": "sua-chave-publicavel",
+  "EMAIL_CONFIRMATION_REDIRECT_URL": "https://seu-dominio/#/email-confirmado"
 }

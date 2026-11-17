@@ -6,6 +6,10 @@ class SignUpResult {
   final bool requiresEmailConfirmation;
 }
 
+class EmailNotConfirmedException implements Exception {
+  const EmailNotConfirmedException();
+}
+
 abstract interface class AuthRepository {
   AppUser? get currentUser;
 
@@ -17,6 +21,7 @@ abstract interface class AuthRepository {
     required String name,
     required String email,
     required String password,
+    String? emailRedirectTo,
   });
 
   Future<void> signOut();

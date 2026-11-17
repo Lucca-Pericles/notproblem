@@ -8,6 +8,7 @@ import '../features/auth/data/supabase_auth_repository.dart';
 import '../features/auth/domain/auth_repository.dart';
 import '../features/auth/presentation/controllers/auth_controller.dart';
 import '../features/auth/presentation/pages/auth_configuration_page.dart';
+import '../features/auth/presentation/pages/email_confirmed_page.dart';
 import '../features/auth/presentation/pages/sign_in_page.dart';
 import '../features/auth/presentation/pages/sign_up_page.dart';
 import '../features/auth/presentation/widgets/auth_scope.dart';
@@ -40,6 +41,7 @@ class _AgileKnowledgeAppState extends State<AgileKnowledgeApp> {
     } else if (AppConfig.hasSupabaseCredentials) {
       _authController = AuthController(
         SupabaseAuthRepository(Supabase.instance.client),
+        emailConfirmationRedirectUrl: AppConfig.emailConfirmationRedirectUrl,
       );
     }
   }
@@ -60,6 +62,11 @@ class _AgileKnowledgeAppState extends State<AgileKnowledgeApp> {
       theme: AppTheme.light,
       home: controller == null
           ? const AuthConfigurationPage()
+          : AppConfig.isEmailConfirmationCallback
+          ? AuthScope(
+              controller: controller,
+              child: EmailConfirmedPage(controller: controller),
+            )
           : AuthScope(
               controller: controller,
               child: _AuthGate(controller: controller),
@@ -77,6 +84,7 @@ class _AgileKnowledgeAppState extends State<AgileKnowledgeApp> {
     final publicPage = switch (settings.name) {
       AppRoutes.signIn => SignInPage(controller: controller),
       AppRoutes.signUp => SignUpPage(controller: controller),
+      AppRoutes.emailConfirmed => EmailConfirmedPage(controller: controller),
       _ => null,
     };
 

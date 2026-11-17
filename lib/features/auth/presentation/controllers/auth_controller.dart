@@ -6,7 +6,8 @@ import '../../domain/app_user.dart';
 import '../../domain/auth_repository.dart';
 
 class AuthController extends ChangeNotifier {
-  AuthController(this._repository) : _user = _repository.currentUser {
+  AuthController(this._repository, {this.emailConfirmationRedirectUrl})
+      : _user = _repository.currentUser {
     _isLoadingSession = false;
     _subscription = _repository.authStateChanges.listen((user) {
       _user = user;
@@ -15,6 +16,7 @@ class AuthController extends ChangeNotifier {
   }
 
   final AuthRepository _repository;
+  final String? emailConfirmationRedirectUrl;
   late final StreamSubscription<AppUser?> _subscription;
 
   AppUser? _user;
@@ -23,7 +25,7 @@ class AuthController extends ChangeNotifier {
   String? _errorMessage;
 
   AppUser? get user => _user;
-  bool get isAuthenticated => _user != null;
+  bool get isAuthenticated => _user?.isEmailConfirmed == true;
   bool get isLoadingSession => _isLoadingSession;
   bool get isSubmitting => _isSubmitting;
   String? get errorMessage => _errorMessage;
@@ -46,6 +48,7 @@ class AuthController extends ChangeNotifier {
         name: name,
         email: email,
         password: password,
+        emailRedirectTo: emailConfirmationRedirectUrl,
       );
       _user = _repository.currentUser;
     });
@@ -95,6 +98,9 @@ class AuthController extends ChangeNotifier {
       return 'Já existe uma conta com este e-mail.';
     }
     if (message.contains('email not confirmed')) {
+      return 'Confirme seu e-mail antes de entrar.';
+    }
+    if (error is EmailNotConfirmedException) {
       return 'Confirme seu e-mail antes de entrar.';
     }
     if (message.contains('network') || message.contains('socket')) {

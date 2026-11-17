@@ -61,6 +61,25 @@ fora do Git:
 flutter build web --dart-define-from-file=config/prod.json
 ```
 
+### Confirmação de e-mail
+
+No painel do Supabase, em **Authentication > URL Configuration**:
+
+1. mantenha **Confirm email** habilitado;
+2. configure o endereço público da aplicação como **Site URL**;
+3. inclua `https://SEU-DOMINIO/#/email-confirmado` em **Redirect URLs**.
+
+Durante o cadastro web, o aplicativo envia automaticamente essa rota do
+domínio aberto para o Supabase. Para fixar uma URL de produção ou suportar um
+aplicativo nativo, informe também `EMAIL_CONFIRMATION_REDIRECT_URL` no arquivo
+de configuração fora do Git. A URL deve coincidir exatamente com uma Redirect
+URL permitida no Supabase.
+
+Após confirmar, o usuário vê a tela **E-mail confirmado** e precisa entrar
+novamente. O aplicativo só considera autenticada uma sessão cujo
+`emailConfirmedAt` tenha sido informado pelo Supabase; as rotas privadas ficam
+indisponíveis para contas pendentes.
+
 O aplicativo nunca recebe nem armazena hashes de senha. O Supabase Auth faz o
 processamento no servidor; o banco público mantém somente o perfil do usuário.
 As políticas RLS garantem que cada usuário leia e altere apenas o próprio perfil.

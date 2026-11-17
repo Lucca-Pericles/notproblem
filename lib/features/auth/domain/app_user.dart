@@ -1,9 +1,15 @@
 class AppUser {
-  const AppUser({required this.id, required this.name, required this.email});
+  const AppUser({
+    required this.id,
+    required this.name,
+    required this.email,
+    required this.isEmailConfirmed,
+  });
 
   final String id;
   final String name;
   final String email;
+  final bool isEmailConfirmed;
 
   String get initials {
     final parts = name

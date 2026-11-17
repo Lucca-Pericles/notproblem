@@ -17,10 +17,15 @@ class SupabaseAuthRepository implements AuthRepository {
 
   @override
   Future<void> signIn({required String email, required String password}) async {
-    await _client.auth.signInWithPassword(
+    final response = await _client.auth.signInWithPassword(
       email: email.trim().toLowerCase(),
       password: password,
     );
+
+    if (response.user?.emailConfirmedAt == null) {
+      await _client.auth.signOut();
+      throw const EmailNotConfirmedException();
+    }
   }
 
   @override
@@ -28,11 +33,13 @@ class SupabaseAuthRepository implements AuthRepository {
     required String name,
     required String email,
     required String password,
+    String? emailRedirectTo,
   }) async {
     final response = await _client.auth.signUp(
       email: email.trim().toLowerCase(),
       password: password,
       data: {'name': name.trim()},
+      emailRedirectTo: emailRedirectTo,
     );
 
     return SignUpResult(requiresEmailConfirmation: response.session == null);
@@ -51,6 +58,7 @@ class SupabaseAuthRepository implements AuthRepository {
       id: user.id,
       name: name?.isNotEmpty == true ? name! : _nameFromEmail(email),
       email: email,
+      isEmailConfirmed: user.emailConfirmedAt != null,
     );
   }
 

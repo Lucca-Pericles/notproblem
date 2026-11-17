@@ -5,6 +5,7 @@ import 'package:agile_knowledge/app/app_routes.dart';
 import 'package:agile_knowledge/features/auth/domain/app_user.dart';
 import 'package:agile_knowledge/features/auth/domain/auth_repository.dart';
 import 'package:agile_knowledge/features/auth/presentation/pages/sign_in_page.dart';
+import 'package:agile_knowledge/features/auth/presentation/pages/email_confirmed_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -31,6 +32,25 @@ void main() {
 
     expect(find.byKey(const Key('signInEmail')), findsOneWidget);
     expect(find.text('Ocorrências'), findsNothing);
+  });
+
+  testWidgets('conta sem e-mail confirmado não acessa rota privada',
+      (tester) async {
+    await tester.pumpWidget(
+      AgileKnowledgeApp(
+        authRepository: FakeAuthRepository(
+          initialUser: const AppUser(
+            id: 'user-pending',
+            name: 'Ana',
+            email: 'ana@exemplo.com',
+            isEmailConfirmed: false,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byKey(const Key('signInEmail')), findsOneWidget);
+    expect(find.text('Olá, Ana'), findsNothing);
   });
 
   testWidgets('login válido abre a página inicial com o nome do usuário',
@@ -60,6 +80,7 @@ void main() {
         id: 'user-1',
         name: 'Gustavo',
         email: 'gustavo@exemplo.com',
+        isEmailConfirmed: true,
       ),
     );
 
@@ -119,12 +140,63 @@ void main() {
 
     expect(find.text('Olá, Ana Silva'), findsOneWidget);
   });
+
+  testWidgets('cadastro pendente informa confirmação e não autentica',
+      (tester) async {
+    await tester.pumpWidget(
+      AgileKnowledgeApp(
+        authRepository: FakeAuthRepository(requiresEmailConfirmation: true),
+      ),
+    );
+
+    await tester.tap(find.text('Criar conta'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('signUpName')), 'Ana Silva');
+    await tester.enterText(
+      find.byKey(const Key('signUpEmail')),
+      'ana@exemplo.com',
+    );
+    await tester.enterText(
+      find.byKey(const Key('signUpPassword')),
+      'Senha123',
+    );
+    await tester.enterText(
+      find.byKey(const Key('signUpPasswordConfirmation')),
+      'Senha123',
+    );
+    await tester.tap(find.byKey(const Key('signUpSubmit')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Confirme seu e-mail'), findsOneWidget);
+    await tester.tap(find.text('Entendi'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('signInEmail')), findsOneWidget);
+  });
+
+  testWidgets('tela de e-mail confirmado leva ao login', (tester) async {
+    await tester.pumpWidget(
+      AgileKnowledgeApp(authRepository: FakeAuthRepository()),
+    );
+
+    final context = tester.element(find.byType(SignInPage));
+    Navigator.of(context).pushNamed(AppRoutes.emailConfirmed);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(EmailConfirmedPage), findsOneWidget);
+    await tester.tap(find.byKey(const Key('emailConfirmedGoToSignIn')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('signInEmail')), findsOneWidget);
+  });
 }
 
 class FakeAuthRepository implements AuthRepository {
-  FakeAuthRepository({AppUser? initialUser}) : _currentUser = initialUser;
+  FakeAuthRepository({
+    AppUser? initialUser,
+    this.requiresEmailConfirmation = false,
+  }) : _currentUser = initialUser;
 
   final _controller = StreamController<AppUser?>.broadcast();
+  final bool requiresEmailConfirmation;
   AppUser? _currentUser;
 
   @override
@@ -135,7 +207,12 @@ class FakeAuthRepository implements AuthRepository {
 
   @override
   Future<void> signIn({required String email, required String password}) async {
-    _currentUser = AppUser(id: 'user-1', name: 'Gustavo', email: email);
+    _currentUser = AppUser(
+      id: 'user-1',
+      name: 'Gustavo',
+      email: email,
+      isEmailConfirmed: true,
+    );
     _controller.add(_currentUser);
   }
 
@@ -144,8 +221,17 @@ class FakeAuthRepository implements AuthRepository {
     required String name,
     required String email,
     required String password,
+    String? emailRedirectTo,
   }) async {
-    _currentUser = AppUser(id: 'user-1', name: name, email: email);
+    if (requiresEmailConfirmation) {
+      return const SignUpResult(requiresEmailConfirmation: true);
+    }
+    _currentUser = AppUser(
+      id: 'user-1',
+      name: name,
+      email: email,
+      isEmailConfirmed: true,
+    );
     _controller.add(_currentUser);
     return const SignUpResult(requiresEmailConfirmation: false);
   }
