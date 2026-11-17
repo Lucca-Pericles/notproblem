@@ -20,9 +20,14 @@ import '../features/occurrences/presentation/pages/occurrences_page.dart';
 import 'app_routes.dart';
 
 class AgileKnowledgeApp extends StatefulWidget {
-  const AgileKnowledgeApp({this.authRepository, super.key});
+  const AgileKnowledgeApp({
+    this.authRepository,
+    this.showEmailConfirmationNotification,
+    super.key,
+  });
 
   final AuthRepository? authRepository;
+  final bool? showEmailConfirmationNotification;
 
   @override
   State<AgileKnowledgeApp> createState() => _AgileKnowledgeAppState();
@@ -62,14 +67,14 @@ class _AgileKnowledgeAppState extends State<AgileKnowledgeApp> {
       theme: AppTheme.light,
       home: controller == null
           ? const AuthConfigurationPage()
-          : AppConfig.isEmailConfirmationCallback
-          ? AuthScope(
-              controller: controller,
-              child: EmailConfirmedPage(controller: controller),
-            )
           : AuthScope(
               controller: controller,
-              child: _AuthGate(controller: controller),
+              child: _EmailConfirmationNotice(
+                controller: controller,
+                show: widget.showEmailConfirmationNotification ??
+                    AppConfig.isEmailConfirmationCallback,
+                child: _AuthGate(controller: controller),
+              ),
             ),
       onGenerateRoute: controller == null
           ? null
@@ -142,6 +147,58 @@ class _AuthGate extends StatelessWidget {
       },
     );
   }
+}
+
+class _EmailConfirmationNotice extends StatefulWidget {
+  const _EmailConfirmationNotice({
+    required this.controller,
+    required this.show,
+    required this.child,
+  });
+
+  final AuthController controller;
+  final bool show;
+  final Widget child;
+
+  @override
+  State<_EmailConfirmationNotice> createState() =>
+      _EmailConfirmationNoticeState();
+}
+
+class _EmailConfirmationNoticeState extends State<_EmailConfirmationNotice> {
+  bool _shown = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_showWhenAuthenticated);
+    _showWhenAuthenticated();
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_showWhenAuthenticated);
+    super.dispose();
+  }
+
+  void _showWhenAuthenticated() {
+    if (_shown || !widget.show || !widget.controller.isAuthenticated) return;
+    _shown = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'E-mail confirmado com sucesso. Você já pode usar o sistema.',
+          ),
+        ),
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 class _PrivateRoute extends StatelessWidget {

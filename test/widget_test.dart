@@ -187,6 +187,30 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('signInEmail')), findsOneWidget);
   });
+
+  testWidgets('callback de confirmação exibe notificação para conta autenticada',
+      (tester) async {
+    await tester.pumpWidget(
+      AgileKnowledgeApp(
+        authRepository: FakeAuthRepository(
+          initialUser: const AppUser(
+            id: 'user-confirmed',
+            name: 'Ana',
+            email: 'ana@exemplo.com',
+            isEmailConfirmed: true,
+          ),
+        ),
+        showEmailConfirmationNotification: true,
+      ),
+    );
+    await tester.pump();
+
+    expect(
+      find.text('E-mail confirmado com sucesso. Você já pode usar o sistema.'),
+      findsOneWidget,
+    );
+    expect(find.text('Olá, Ana'), findsOneWidget);
+  });
 }
 
 class FakeAuthRepository implements AuthRepository {
