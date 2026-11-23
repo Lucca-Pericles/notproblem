@@ -14,12 +14,13 @@ import '../features/auth/presentation/pages/sign_up_page.dart';
 import '../features/auth/presentation/widgets/auth_scope.dart';
 import '../features/dashboard/presentation/pages/dashboard_page.dart';
 import '../features/history/presentation/pages/history_page.dart';
+import '../features/investigations/data/supabase_five_whys_repository.dart';
+import '../features/investigations/domain/five_whys_repository.dart';
 import '../features/investigations/presentation/pages/investigation_page.dart';
 import '../features/occurrences/presentation/pages/new_occurrence_page.dart';
 import '../features/occurrences/presentation/pages/occurrence_detail_page.dart';
 import '../features/occurrences/presentation/pages/occurrences_page.dart';
 import '../features/occurrences/data/supabase_occurrence_repository.dart';
-import '../features/occurrences/domain/occurrence.dart';
 import '../features/occurrences/domain/occurrence_repository.dart';
 import 'app_routes.dart';
 
@@ -27,12 +28,14 @@ class AgileKnowledgeApp extends StatefulWidget {
   const AgileKnowledgeApp({
     this.authRepository,
     this.occurrenceRepository,
+    this.fiveWhysRepository,
     this.showEmailConfirmationNotification,
     super.key,
   });
 
   final AuthRepository? authRepository;
   final OccurrenceRepository? occurrenceRepository;
+  final FiveWhysRepository? fiveWhysRepository;
   final bool? showEmailConfirmationNotification;
 
   @override
@@ -42,6 +45,7 @@ class AgileKnowledgeApp extends StatefulWidget {
 class _AgileKnowledgeAppState extends State<AgileKnowledgeApp> {
   AuthController? _authController;
   OccurrenceRepository? _occurrenceRepository;
+  FiveWhysRepository? _fiveWhysRepository;
 
   @override
   void initState() {
@@ -51,12 +55,16 @@ class _AgileKnowledgeAppState extends State<AgileKnowledgeApp> {
     if (repository != null) {
       _authController = AuthController(repository);
       _occurrenceRepository = widget.occurrenceRepository;
+      _fiveWhysRepository = widget.fiveWhysRepository;
     } else if (AppConfig.hasSupabaseCredentials) {
       _authController = AuthController(
         SupabaseAuthRepository(Supabase.instance.client),
         emailConfirmationRedirectUrl: AppConfig.emailConfirmationRedirectUrl,
       );
       _occurrenceRepository = SupabaseOccurrenceRepository(
+        Supabase.instance.client,
+      );
+      _fiveWhysRepository = SupabaseFiveWhysRepository(
         Supabase.instance.client,
       );
     }
@@ -121,8 +129,13 @@ class _AgileKnowledgeAppState extends State<AgileKnowledgeApp> {
       AppRoutes.occurrenceDetail => OccurrenceDetailPage(
           occurrenceId: settings.arguments as String? ?? '',
           repository: _occurrenceRepository,
+          fiveWhysRepository: _fiveWhysRepository,
         ),
-      AppRoutes.investigations => const InvestigationPage(),
+      AppRoutes.investigations => InvestigationPage(
+          occurrenceId: settings.arguments as String? ?? '',
+          occurrenceRepository: _occurrenceRepository,
+          fiveWhysRepository: _fiveWhysRepository,
+        ),
       AppRoutes.actions => const ActionFollowUpPage(),
       AppRoutes.history => const HistoryPage(),
       _ => const DashboardPage(),

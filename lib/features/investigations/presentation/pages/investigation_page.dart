@@ -7,9 +7,97 @@ import '../../../../shared/widgets/app_shell.dart';
 import '../../../../shared/widgets/page_header.dart';
 import '../../../../shared/widgets/section_card.dart';
 import '../../../../shared/widgets/status_badge.dart';
+import '../../../occurrences/domain/occurrence.dart';
+import '../../../occurrences/domain/occurrence_repository.dart';
+import '../../domain/five_whys_investigation.dart';
+import '../../domain/five_whys_repository.dart';
 
-class InvestigationPage extends StatelessWidget {
-  const InvestigationPage({super.key});
+class InvestigationPage extends StatefulWidget {
+  const InvestigationPage({
+    this.occurrenceId = '',
+    this.occurrenceRepository,
+    this.fiveWhysRepository,
+    super.key,
+  });
+
+  final String occurrenceId;
+  final OccurrenceRepository? occurrenceRepository;
+  final FiveWhysRepository? fiveWhysRepository;
+
+  @override
+  State<InvestigationPage> createState() => _InvestigationPageState();
+}
+
+class _InvestigationPageState extends State<InvestigationPage> {
+  final _answerFormKey = GlobalKey<FormState>();
+  final _reviewFormKey = GlobalKey<FormState>();
+  final _answerController = TextEditingController();
+  List<TextEditingController> _reviewControllers = [];
+  Occurrence? _occurrence;
+  FiveWhysInvestigation? _investigation;
+  int _stepIndex = 0;
+  bool _loading = true;
+  bool _saving = false;
+  bool _reviewing = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _answerController.dispose();
+    _disposeReviewControllers();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    final occurrences = widget.occurrenceRepository;
+    final investigations = widget.fiveWhysRepository;
+    if (widget.occurrenceId.isEmpty ||
+        occurrences == null ||
+        investigations == null) {
+      if (mounted) setState(() => _loading = false);
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
+    try {
+      final occurrence = await occurrences.getById(widget.occurrenceId);
+      if (occurrence == null) {
+        if (mounted) setState(() => _loading = false);
+        return;
+      }
+      final investigation = await investigations.getOrCreate(occurrence.id);
+      if (!mounted) return;
+      _occurrence = occurrence;
+      _applyInvestigation(investigation);
+      setState(() => _loading = false);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'Não foi possível carregar a investigação.';
+      });
+    }
+  }
+
+  void _applyInvestigation(FiveWhysInvestigation investigation) {
+    _investigation = investigation;
+    _reviewing = investigation.isReadyForReview;
+    _stepIndex =
+        investigation.currentStep > 5 ? 4 : investigation.currentStep - 1;
+    _answerController.text = investigation.answers[_stepIndex] ?? '';
+    if (_reviewing) _prepareReviewControllers(investigation.answers);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -20,41 +108,391 @@ class InvestigationPage extends StatelessWidget {
         children: [
           const PageHeader(
             title: 'Investigação com 5 Porquês',
-            subtitle: 'Encontre uma causa provável, uma pergunta de cada vez.',
+            subtitle:
+                'Investigue uma possível causa, uma pergunta de cada vez.',
           ),
           const SizedBox(height: AppSpacing.lg),
-          const _ProgressCard(),
+          const _MethodExplanation(),
           const SizedBox(height: AppSpacing.lg),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              if (constraints.maxWidth < 850) {
-                return const Column(
-                  children: [
-                    _ContextCard(),
-                    SizedBox(height: AppSpacing.lg),
-                    _QuestionCard(),
-                  ],
-                );
-              }
+          _buildContent(),
+        ],
+      ),
+    );
+  }
 
-              return const Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildContent() {
+    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_error != null) {
+      return SectionCard(
+        child: Column(
+          children: [
+            Text(_error!),
+            const SizedBox(height: AppSpacing.md),
+            OutlinedButton(
+              onPressed: _load,
+              child: const Text('Tentar novamente'),
+            ),
+          ],
+        ),
+      );
+    }
+    if (_occurrence == null || _investigation == null) {
+      return SectionCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Escolha uma ocorrência para iniciar ou retomar a análise.',
+            ),
+            const SizedBox(height: AppSpacing.md),
+            FilledButton(
+              onPressed: () => Navigator.of(context)
+                  .pushReplacementNamed(AppRoutes.occurrences),
+              child: const Text('Ver ocorrências'),
+            ),
+          ],
+        ),
+      );
+    }
+    if (_investigation!.isCompleted) return _buildCompleted();
+    if (_reviewing) return _buildReview();
+    return _buildQuestion();
+  }
+
+  Widget _buildQuestion() {
+    final investigation = _investigation!;
+    final step = _stepIndex + 1;
+    return Column(
+      children: [
+        _ProgressCard(step: step),
+        const SizedBox(height: AppSpacing.lg),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final contextCard = _OccurrenceContext(occurrence: _occurrence!);
+            final questionCard = _QuestionCard(
+              step: step,
+              question: investigation.questionFor(step, _occurrence!.title),
+              previousAnswers: investigation.answers.take(_stepIndex).toList(),
+              controller: _answerController,
+              formKey: _answerFormKey,
+              saving: _saving,
+              onBack: _stepIndex == 0 ? null : _goBack,
+              onSave: _saveAndContinue,
+            );
+            if (constraints.maxWidth < 850) {
+              return Column(
                 children: [
-                  SizedBox(width: 260, child: _ContextCard()),
-                  SizedBox(width: AppSpacing.lg),
-                  Expanded(child: _QuestionCard()),
+                  contextCard,
+                  const SizedBox(height: AppSpacing.lg),
+                  questionCard,
                 ],
               );
-            },
+            }
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(width: 280, child: contextCard),
+                const SizedBox(width: AppSpacing.lg),
+                Expanded(child: questionCard),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReview() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const PageHeader(
+          title: 'Revise as respostas',
+          subtitle: 'Confira e edite o raciocínio completo antes de finalizar.',
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        SectionCard(
+          child: Form(
+            key: _reviewFormKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var index = 0; index < 5; index++) ...[
+                  Text(
+                    '${index + 1}º porquê',
+                    style: const TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    _reviewQuestion(index),
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  TextFormField(
+                    key: Key('fiveWhysReviewAnswer${index + 1}'),
+                    controller: _reviewControllers[index],
+                    enabled: !_saving,
+                    maxLines: 3,
+                    maxLength: 4000,
+                    validator: _validateAnswer,
+                    onChanged: (_) => setState(() {}),
+                  ),
+                  if (index < 4) const Divider(height: AppSpacing.xl),
+                ],
+                const SizedBox(height: AppSpacing.md),
+                Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  spacing: AppSpacing.md,
+                  runSpacing: AppSpacing.sm,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: _saving ? null : _returnToLastQuestion,
+                      icon: const Icon(Icons.arrow_back_rounded),
+                      label: const Text('Voltar'),
+                    ),
+                    Wrap(
+                      spacing: AppSpacing.sm,
+                      children: [
+                        OutlinedButton(
+                          key: const Key('fiveWhysSaveReview'),
+                          onPressed: _saving ? null : _saveReview,
+                          child: const Text('Salvar alterações'),
+                        ),
+                        FilledButton.icon(
+                          key: const Key('fiveWhysComplete'),
+                          onPressed: _saving ? null : _complete,
+                          icon: const Icon(Icons.check_rounded),
+                          label: const Text('Finalizar análise'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCompleted() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SectionCard(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.check_circle, color: AppColors.success),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '5 Porquês concluídos',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    const Text(
+                      'As cinco respostas foram registradas. A causa encontrada é uma hipótese e ainda deve ser validada com evidências.',
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        SectionCard(
+          title: _occurrence!.title,
+          child: Column(
+            children: [
+              for (var index = 0; index < 5; index++) ...[
+                _CompletedAnswer(
+                  number: index + 1,
+                  question: _investigation!.questionFor(
+                    index + 1,
+                    _occurrence!.title,
+                  ),
+                  answer: _investigation!.answers[index]!,
+                ),
+                if (index < 4) const Divider(height: AppSpacing.xl),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _saveAndContinue() async {
+    if (!_answerFormKey.currentState!.validate()) return;
+    setState(() => _saving = true);
+    try {
+      final updated = await widget.fiveWhysRepository!.saveAnswer(
+        investigationId: _investigation!.id,
+        step: _stepIndex + 1,
+        answer: _answerController.text,
+      );
+      if (!mounted) return;
+      setState(() {
+        _investigation = updated;
+        if (_stepIndex == 4) {
+          _reviewing = true;
+          _prepareReviewControllers(updated.answers);
+        } else {
+          _stepIndex++;
+          _answerController.text = updated.answers[_stepIndex] ?? '';
+        }
+      });
+    } catch (_) {
+      _showError('Não foi possível salvar a resposta. Tente novamente.');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  void _goBack() {
+    setState(() {
+      _stepIndex--;
+      _answerController.text = _investigation!.answers[_stepIndex] ?? '';
+    });
+  }
+
+  Future<void> _returnToLastQuestion() async {
+    final answers = _validatedReviewAnswers();
+    if (answers == null) return;
+    setState(() => _saving = true);
+    try {
+      final updated = await widget.fiveWhysRepository!.saveAnswers(
+        investigationId: _investigation!.id,
+        answers: answers,
+      );
+      if (!mounted) return;
+      setState(() {
+        _investigation = updated;
+        _reviewing = false;
+        _stepIndex = 4;
+        _answerController.text = updated.answers[4] ?? '';
+      });
+    } catch (_) {
+      _showError('Não foi possível salvar a análise. Tente novamente.');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _saveReview() async {
+    final answers = _validatedReviewAnswers();
+    if (answers == null) return;
+    await _runReviewSave(
+      () => widget.fiveWhysRepository!.saveAnswers(
+        investigationId: _investigation!.id,
+        answers: answers,
+      ),
+      successMessage: 'Alterações salvas.',
+    );
+  }
+
+  Future<void> _complete() async {
+    final answers = _validatedReviewAnswers();
+    if (answers == null) return;
+    await _runReviewSave(
+      () => widget.fiveWhysRepository!.complete(
+        investigationId: _investigation!.id,
+        answers: answers,
+      ),
+    );
+  }
+
+  List<String>? _validatedReviewAnswers() {
+    if (!_reviewFormKey.currentState!.validate()) return null;
+    return _reviewControllers
+        .map((controller) => controller.text.trim())
+        .toList();
+  }
+
+  Future<void> _runReviewSave(
+    Future<FiveWhysInvestigation> Function() operation, {
+    String? successMessage,
+  }) async {
+    setState(() => _saving = true);
+    try {
+      final updated = await operation();
+      if (!mounted) return;
+      setState(() => _investigation = updated);
+      if (successMessage != null) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(successMessage)));
+      }
+    } catch (_) {
+      _showError('Não foi possível salvar a análise. Tente novamente.');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  String _reviewQuestion(int index) {
+    if (index == 0) {
+      return 'Por que a tarefa “${_occurrence!.title}” atrasou?';
+    }
+    final previous = _reviewControllers[index - 1].text.trim();
+    return previous.isEmpty
+        ? 'Por que isso aconteceu?'
+        : 'Por que isso aconteceu: “$previous”?';
+  }
+
+  void _prepareReviewControllers(List<String?> answers) {
+    _disposeReviewControllers();
+    _reviewControllers = [
+      for (final answer in answers) TextEditingController(text: answer ?? ''),
+    ];
+  }
+
+  void _disposeReviewControllers() {
+    for (final controller in _reviewControllers) {
+      controller.dispose();
+    }
+    _reviewControllers = [];
+  }
+
+  String? _validateAnswer(String? value) {
+    final length = value?.trim().length ?? 0;
+    if (length < 2) return 'Informe uma resposta antes de continuar.';
+    if (length > 4000) return 'Use no máximo 4000 caracteres.';
+    return null;
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
+}
+
+class _MethodExplanation extends StatelessWidget {
+  const _MethodExplanation();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SectionCard(
+      title: 'Para que servem os 5 Porquês?',
+      child: Text(
+        'O método ajuda a explorar relações de causa e efeito repetindo a pergunta “por quê?”. Ele orienta uma hipótese, mas não comprova a causa sozinho: valide as conclusões com a equipe e com evidências do trabalho.',
       ),
     );
   }
 }
 
 class _ProgressCard extends StatelessWidget {
-  const _ProgressCard();
+  const _ProgressCard({required this.step});
+
+  final int step;
 
   @override
   Widget build(BuildContext context) {
@@ -63,22 +501,22 @@ class _ProgressCard extends StatelessWidget {
         padding: const EdgeInsets.all(AppSpacing.md),
         child: Row(
           children: [
-            const Text(
-              'Pergunta 3 de 5',
-              style: TextStyle(fontWeight: FontWeight.w700),
+            Text(
+              'Pergunta $step de 5',
+              style: const TextStyle(fontWeight: FontWeight.w700),
             ),
             const SizedBox(width: AppSpacing.lg),
-            const Expanded(
+            Expanded(
               child: LinearProgressIndicator(
-                value: .6,
+                value: step / 5,
                 minHeight: 10,
-                borderRadius: BorderRadius.all(Radius.circular(8)),
+                borderRadius: BorderRadius.circular(8),
               ),
             ),
             const SizedBox(width: AppSpacing.md),
             Text(
-              '60%',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              '${step * 20}%',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: AppColors.primary,
                   ),
             ),
@@ -89,8 +527,10 @@ class _ProgressCard extends StatelessWidget {
   }
 }
 
-class _ContextCard extends StatelessWidget {
-  const _ContextCard();
+class _OccurrenceContext extends StatelessWidget {
+  const _OccurrenceContext({required this.occurrence});
+
+  final Occurrence occurrence;
 
   @override
   Widget build(BuildContext context) {
@@ -99,155 +539,114 @@ class _ContextCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _ContextItem(
-            icon: Icons.assignment_outlined,
-            label: 'Tarefa',
-            value: 'Implementar autenticação',
-          ),
-          const Divider(height: 32),
-          const _ContextItem(
-            icon: Icons.layers_outlined,
-            label: 'Sprint',
-            value: 'Sprint 04',
-          ),
-          const Divider(height: 32),
-          const Text(
-            'Status',
-            style: TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 12,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          const StatusBadge(
-            label: 'Em investigação',
-            tone: BadgeTone.success,
-          ),
-          const Divider(height: 32),
           Text(
-            'A tarefa foi concluída com 3 dias de atraso, impactando a entrega da Sprint.',
-            style: Theme.of(context).textTheme.bodyMedium,
+            occurrence.title,
+            style: const TextStyle(fontWeight: FontWeight.w700),
           ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(occurrence.project),
+          const Divider(height: AppSpacing.xl),
+          const StatusBadge(label: 'Em investigação', tone: BadgeTone.info),
+          const Divider(height: AppSpacing.xl),
+          Text(occurrence.context),
         ],
       ),
     );
   }
 }
 
-class _ContextItem extends StatelessWidget {
-  const _ContextItem({
-    required this.icon,
-    required this.label,
-    required this.value,
+class _QuestionCard extends StatelessWidget {
+  const _QuestionCard({
+    required this.step,
+    required this.question,
+    required this.previousAnswers,
+    required this.controller,
+    required this.formKey,
+    required this.saving,
+    required this.onBack,
+    required this.onSave,
   });
 
-  final IconData icon;
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, color: AppColors.primary, size: 20),
-        const SizedBox(width: AppSpacing.sm),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: Theme.of(context).textTheme.bodyMedium),
-              const SizedBox(height: 2),
-              Text(value, style: const TextStyle(fontWeight: FontWeight.w700)),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _QuestionCard extends StatelessWidget {
-  const _QuestionCard();
+  final int step;
+  final String question;
+  final List<String?> previousAnswers;
+  final TextEditingController controller;
+  final GlobalKey<FormState> formKey;
+  final bool saving;
+  final VoidCallback? onBack;
+  final VoidCallback onSave;
 
   @override
   Widget build(BuildContext context) {
     return SectionCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const StatusBadge(label: 'TERCEIRO PORQUÊ'),
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            'Por que a revisão só aconteceu no fim da Sprint?',
-            style: Theme.of(context).textTheme.headlineSmall,
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          const TextField(
-            maxLines: 5,
-            decoration: InputDecoration(
-              hintText: 'Escreva a resposta da equipe...',
+      child: Form(
+        key: formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            StatusBadge(label: '$stepº PORQUÊ'),
+            const SizedBox(height: AppSpacing.md),
+            Text(question, style: Theme.of(context).textTheme.headlineSmall),
+            const SizedBox(height: AppSpacing.lg),
+            TextFormField(
+              key: const Key('fiveWhysAnswer'),
+              controller: controller,
+              enabled: !saving,
+              maxLines: 5,
+              maxLength: 4000,
+              decoration: const InputDecoration(
+                hintText: 'Descreva o que pode ter causado isso...',
+              ),
+              validator: (value) {
+                final length = value?.trim().length ?? 0;
+                if (length < 2) {
+                  return 'Informe uma resposta antes de continuar.';
+                }
+                if (length > 4000) return 'Use no máximo 4000 caracteres.';
+                return null;
+              },
             ),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          const _PreviousAnswers(),
-          const SizedBox(height: AppSpacing.lg),
-          Container(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            decoration: BoxDecoration(
-              color: AppColors.infoSoft,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            if (previousAnswers.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.md),
+              _PreviousAnswers(answers: previousAnswers),
+            ],
+            const SizedBox(height: AppSpacing.lg),
+            const _NoBlameTip(),
+            const SizedBox(height: AppSpacing.lg),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Icon(Icons.lightbulb_outline, color: AppColors.primary),
-                SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Não procure culpados',
-                        style: TextStyle(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      SizedBox(height: AppSpacing.xs),
-                      Text(
-                        'Concentre a resposta no processo e no que a equipe pode melhorar.',
-                      ),
-                    ],
+                OutlinedButton.icon(
+                  onPressed: saving ? null : onBack,
+                  icon: const Icon(Icons.arrow_back_rounded),
+                  label: const Text('Voltar'),
+                ),
+                FilledButton.icon(
+                  key: const Key('fiveWhysSaveAndContinue'),
+                  onPressed: saving ? null : onSave,
+                  icon: saving
+                      ? const SizedBox.square(
+                          dimension: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.arrow_forward_rounded),
+                  label: Text(
+                    step == 5 ? 'Revisar respostas' : 'Salvar e continuar',
                   ),
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              OutlinedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.arrow_back_rounded),
-                label: const Text('Voltar'),
-              ),
-              FilledButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.arrow_forward_rounded),
-                label: const Text('Salvar e continuar'),
-              ),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
 class _PreviousAnswers extends StatelessWidget {
-  const _PreviousAnswers();
+  const _PreviousAnswers({required this.answers});
+
+  final List<String?> answers;
 
   @override
   Widget build(BuildContext context) {
@@ -258,24 +657,45 @@ class _PreviousAnswers extends StatelessWidget {
         border: Border.all(color: AppColors.border),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: const Column(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          const Text(
             'Respostas anteriores',
             style: TextStyle(fontWeight: FontWeight.w700),
           ),
-          SizedBox(height: AppSpacing.md),
-          _AnswerItem(
-            number: '1',
-            question: 'Por que a tarefa atrasou?',
-            answer: 'O código ficou aguardando revisão por vários dias.',
-          ),
-          Divider(height: 24),
-          _AnswerItem(
-            number: '2',
-            question: 'Por que o código aguardou revisão?',
-            answer: 'A revisão só aconteceu no fim da Sprint.',
+          const SizedBox(height: AppSpacing.sm),
+          for (var index = 0; index < answers.length; index++)
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.xs),
+              child: Text('${index + 1}. ${answers[index]}'),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NoBlameTip extends StatelessWidget {
+  const _NoBlameTip();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.infoSoft,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: const Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.lightbulb_outline, color: AppColors.primary),
+          SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Text(
+              'Evite procurar culpados. Concentre a resposta no processo e no que a equipe pode aprender.',
+            ),
           ),
         ],
       ),
@@ -283,14 +703,14 @@ class _PreviousAnswers extends StatelessWidget {
   }
 }
 
-class _AnswerItem extends StatelessWidget {
-  const _AnswerItem({
+class _CompletedAnswer extends StatelessWidget {
+  const _CompletedAnswer({
     required this.number,
     required this.question,
     required this.answer,
   });
 
-  final String number;
+  final int number;
   final String question;
   final String answer;
 
@@ -299,20 +719,18 @@ class _AnswerItem extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        CircleAvatar(
-          radius: 14,
-          backgroundColor: AppColors.successSoft,
-          foregroundColor: AppColors.success,
-          child: Text(number),
-        ),
+        CircleAvatar(radius: 14, child: Text('$number')),
         const SizedBox(width: AppSpacing.md),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(question, style: const TextStyle(fontWeight: FontWeight.w700)),
+              Text(
+                question,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
               const SizedBox(height: AppSpacing.xs),
-              Text(answer, style: Theme.of(context).textTheme.bodyMedium),
+              Text(answer),
             ],
           ),
         ),

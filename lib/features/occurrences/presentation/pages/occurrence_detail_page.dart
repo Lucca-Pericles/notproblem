@@ -5,30 +5,43 @@ import '../../../../shared/widgets/app_shell.dart';
 import '../../../../shared/widgets/page_header.dart';
 import '../../../../shared/widgets/section_card.dart';
 import '../../../../shared/widgets/status_badge.dart';
+import '../../../investigations/domain/five_whys_investigation.dart';
+import '../../../investigations/domain/five_whys_repository.dart';
 import '../../domain/occurrence.dart';
 import '../../domain/occurrence_repository.dart';
 
 class OccurrenceDetailPage extends StatefulWidget {
-  const OccurrenceDetailPage(
-      {required this.occurrenceId, this.repository, super.key});
+  const OccurrenceDetailPage({
+    required this.occurrenceId,
+    this.repository,
+    this.fiveWhysRepository,
+    super.key,
+  });
   final String occurrenceId;
   final OccurrenceRepository? repository;
+  final FiveWhysRepository? fiveWhysRepository;
   @override
   State<OccurrenceDetailPage> createState() => _OccurrenceDetailPageState();
 }
 
 class _OccurrenceDetailPageState extends State<OccurrenceDetailPage> {
   late Future<Occurrence?> _future;
+  late Future<FiveWhysInvestigation?> _fiveWhysFuture;
   @override
   void initState() {
     super.initState();
     _future = _load();
+    _fiveWhysFuture = _loadFiveWhys();
   }
 
   Future<Occurrence?> _load() =>
       widget.occurrenceId.isEmpty || widget.repository == null
           ? Future.value(null)
           : widget.repository!.getById(widget.occurrenceId);
+  Future<FiveWhysInvestigation?> _loadFiveWhys() =>
+      widget.occurrenceId.isEmpty || widget.fiveWhysRepository == null
+          ? Future.value(null)
+          : widget.fiveWhysRepository!.findByOccurrence(widget.occurrenceId);
   @override
   Widget build(BuildContext context) => AppShell(
       currentRoute: AppRoutes.occurrences,
@@ -59,17 +72,79 @@ class _OccurrenceDetailPageState extends State<OccurrenceDetailPage> {
                         const SizedBox(height: AppSpacing.lg),
                         _field('Impacto', item.impact),
                         const SizedBox(height: AppSpacing.lg),
-                        if (item.status == OccurrenceStatus.completed)
-                          const Text(
-                              'A análise foi concluída e o contexto não pode mais ser editado.')
-                        else
-                          FilledButton(
-                              key: const Key('editContext'),
-                              onPressed: () => _edit(item),
-                              child: const Text('Editar contexto'))
+                        _buildActions(item),
                       ]))
                 ]);
           }));
+  Widget _buildActions(Occurrence item) =>
+      FutureBuilder<FiveWhysInvestigation?>(
+        future: _fiveWhysFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const SizedBox.square(
+              dimension: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            );
+          }
+          if (snapshot.hasError) {
+            return const Text(
+              'Não foi possível verificar o estado da investigação.',
+            );
+          }
+          final fiveWhysCompleted = snapshot.data?.isCompleted ?? false;
+          final locked =
+              item.status == OccurrenceStatus.completed || fiveWhysCompleted;
+          if (locked) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'A análise foi concluída e o contexto não pode mais ser editado.',
+                ),
+                if (fiveWhysCompleted) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  OutlinedButton.icon(
+                    key: const Key('openFiveWhys'),
+                    onPressed: () => _openFiveWhys(item),
+                    icon: const Icon(Icons.visibility_outlined),
+                    label: const Text('Ver análise dos 5 Porquês'),
+                  ),
+                ],
+              ],
+            );
+          }
+          return Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: [
+              FilledButton.icon(
+                key: const Key('openFiveWhys'),
+                onPressed: () => _openFiveWhys(item),
+                icon: const Icon(Icons.account_tree_outlined),
+                label: const Text('Abrir análise dos 5 Porquês'),
+              ),
+              OutlinedButton(
+                key: const Key('editContext'),
+                onPressed: () => _edit(item),
+                child: const Text('Editar contexto'),
+              ),
+            ],
+          );
+        },
+      );
+  Future<void> _openFiveWhys(Occurrence item) async {
+    await Navigator.of(context).pushNamed(
+      AppRoutes.investigations,
+      arguments: item.id,
+    );
+    if (mounted) {
+      setState(() {
+        _future = _load();
+        _fiveWhysFuture = _loadFiveWhys();
+      });
+    }
+  }
+
   Widget _field(String l, String v) =>
       Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(l, style: const TextStyle(fontWeight: FontWeight.w700)),

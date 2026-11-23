@@ -88,6 +88,7 @@ As políticas RLS garantem que cada usuário leia e altere apenas o próprio per
 
 - cadastro com nome, e-mail e senha validada;
 - registro, consulta e detalhe de ocorrências vinculadas à conta autenticada;
+- análise guiada e retomável dos 5 Porquês, com revisão antes da finalização;
 - login, persistência de sessão e logout;
 - redirecionamento de rotas privadas para a tela de entrada;
 - página inicial personalizada com o nome autenticado;
