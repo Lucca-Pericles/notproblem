@@ -3,6 +3,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/app_config.dart';
 import '../core/theme/app_theme.dart';
+import '../features/actions/data/supabase_action_plan_repository.dart';
+import '../features/actions/domain/action_plan_repository.dart';
 import '../features/actions/presentation/pages/action_follow_up_page.dart';
 import '../features/auth/data/supabase_auth_repository.dart';
 import '../features/auth/domain/auth_repository.dart';
@@ -29,6 +31,7 @@ class AgileKnowledgeApp extends StatefulWidget {
     this.authRepository,
     this.occurrenceRepository,
     this.fiveWhysRepository,
+    this.actionPlanRepository,
     this.showEmailConfirmationNotification,
     super.key,
   });
@@ -36,6 +39,7 @@ class AgileKnowledgeApp extends StatefulWidget {
   final AuthRepository? authRepository;
   final OccurrenceRepository? occurrenceRepository;
   final FiveWhysRepository? fiveWhysRepository;
+  final ActionPlanRepository? actionPlanRepository;
   final bool? showEmailConfirmationNotification;
 
   @override
@@ -46,6 +50,7 @@ class _AgileKnowledgeAppState extends State<AgileKnowledgeApp> {
   AuthController? _authController;
   OccurrenceRepository? _occurrenceRepository;
   FiveWhysRepository? _fiveWhysRepository;
+  ActionPlanRepository? _actionPlanRepository;
 
   @override
   void initState() {
@@ -56,6 +61,7 @@ class _AgileKnowledgeAppState extends State<AgileKnowledgeApp> {
       _authController = AuthController(repository);
       _occurrenceRepository = widget.occurrenceRepository;
       _fiveWhysRepository = widget.fiveWhysRepository;
+      _actionPlanRepository = widget.actionPlanRepository;
     } else if (AppConfig.hasSupabaseCredentials) {
       _authController = AuthController(
         SupabaseAuthRepository(Supabase.instance.client),
@@ -65,6 +71,9 @@ class _AgileKnowledgeAppState extends State<AgileKnowledgeApp> {
         Supabase.instance.client,
       );
       _fiveWhysRepository = SupabaseFiveWhysRepository(
+        Supabase.instance.client,
+      );
+      _actionPlanRepository = SupabaseActionPlanRepository(
         Supabase.instance.client,
       );
     }
@@ -136,7 +145,12 @@ class _AgileKnowledgeAppState extends State<AgileKnowledgeApp> {
           occurrenceRepository: _occurrenceRepository,
           fiveWhysRepository: _fiveWhysRepository,
         ),
-      AppRoutes.actions => const ActionFollowUpPage(),
+      AppRoutes.actions => ActionFollowUpPage(
+          occurrenceId: settings.arguments as String? ?? '',
+          occurrenceRepository: _occurrenceRepository,
+          fiveWhysRepository: _fiveWhysRepository,
+          actionPlanRepository: _actionPlanRepository,
+        ),
       AppRoutes.history => const HistoryPage(),
       _ => const DashboardPage(),
     };

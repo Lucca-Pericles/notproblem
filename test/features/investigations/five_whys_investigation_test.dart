@@ -107,6 +107,7 @@ void main() {
       'A revisão foi iniciada somente no fim.',
     );
     expect(find.text('5 Porquês concluídos'), findsOneWidget);
+    expect(find.byKey(const Key('actionPlanFromFiveWhys')), findsOneWidget);
   });
 
   testWidgets('contexto fica bloqueado após concluir os 5 Porquês',

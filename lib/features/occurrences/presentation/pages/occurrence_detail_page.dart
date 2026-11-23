@@ -103,11 +103,23 @@ class _OccurrenceDetailPageState extends State<OccurrenceDetailPage> {
                 ),
                 if (fiveWhysCompleted) ...[
                   const SizedBox(height: AppSpacing.sm),
-                  OutlinedButton.icon(
-                    key: const Key('openFiveWhys'),
-                    onPressed: () => _openFiveWhys(item),
-                    icon: const Icon(Icons.visibility_outlined),
-                    label: const Text('Ver análise dos 5 Porquês'),
+                  Wrap(
+                    spacing: AppSpacing.sm,
+                    runSpacing: AppSpacing.sm,
+                    children: [
+                      OutlinedButton.icon(
+                        key: const Key('openFiveWhys'),
+                        onPressed: () => _openFiveWhys(item),
+                        icon: const Icon(Icons.visibility_outlined),
+                        label: const Text('Ver análise dos 5 Porquês'),
+                      ),
+                      FilledButton.icon(
+                        key: const Key('openActionPlan'),
+                        onPressed: () => _openActionPlan(item),
+                        icon: const Icon(Icons.task_alt_rounded),
+                        label: const Text('Causa e plano de ação'),
+                      ),
+                    ],
                   ),
                 ],
               ],
@@ -143,6 +155,14 @@ class _OccurrenceDetailPageState extends State<OccurrenceDetailPage> {
         _fiveWhysFuture = _loadFiveWhys();
       });
     }
+  }
+
+  Future<void> _openActionPlan(Occurrence item) async {
+    await Navigator.of(context).pushNamed(
+      AppRoutes.actions,
+      arguments: item.id,
+    );
+    if (mounted) setState(() => _future = _load());
   }
 
   Widget _field(String l, String v) =>

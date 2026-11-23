@@ -301,6 +301,16 @@ class _InvestigationPageState extends State<InvestigationPage> {
                     const Text(
                       'As cinco respostas foram registradas. A causa encontrada é uma hipótese e ainda deve ser validada com evidências.',
                     ),
+                    const SizedBox(height: AppSpacing.md),
+                    FilledButton.icon(
+                      key: const Key('actionPlanFromFiveWhys'),
+                      onPressed: () => Navigator.of(context).pushNamed(
+                        AppRoutes.actions,
+                        arguments: _occurrence!.id,
+                      ),
+                      icon: const Icon(Icons.task_alt_rounded),
+                      label: const Text('Registrar causa e plano de ação'),
+                    ),
                   ],
                 ),
               ),
