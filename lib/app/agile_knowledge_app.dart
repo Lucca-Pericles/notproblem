@@ -4,6 +4,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/config/app_config.dart';
 import '../core/theme/app_theme.dart';
 import '../features/actions/data/supabase_action_plan_repository.dart';
+import '../features/actions/data/supabase_action_follow_up_repository.dart';
+import '../features/actions/domain/action_follow_up_repository.dart';
 import '../features/actions/domain/action_plan_repository.dart';
 import '../features/actions/presentation/pages/action_follow_up_page.dart';
 import '../features/auth/data/supabase_auth_repository.dart';
@@ -33,6 +35,7 @@ class AgileKnowledgeApp extends StatefulWidget {
     this.occurrenceRepository,
     this.fiveWhysRepository,
     this.actionPlanRepository,
+    this.actionFollowUpRepository,
     this.showEmailConfirmationNotification,
     super.key,
   });
@@ -41,6 +44,7 @@ class AgileKnowledgeApp extends StatefulWidget {
   final OccurrenceRepository? occurrenceRepository;
   final FiveWhysRepository? fiveWhysRepository;
   final ActionPlanRepository? actionPlanRepository;
+  final ActionFollowUpRepository? actionFollowUpRepository;
   final bool? showEmailConfirmationNotification;
 
   @override
@@ -52,6 +56,7 @@ class _AgileKnowledgeAppState extends State<AgileKnowledgeApp> {
   OccurrenceRepository? _occurrenceRepository;
   FiveWhysRepository? _fiveWhysRepository;
   ActionPlanRepository? _actionPlanRepository;
+  ActionFollowUpRepository? _actionFollowUpRepository;
 
   @override
   void initState() {
@@ -63,6 +68,7 @@ class _AgileKnowledgeAppState extends State<AgileKnowledgeApp> {
       _occurrenceRepository = widget.occurrenceRepository;
       _fiveWhysRepository = widget.fiveWhysRepository;
       _actionPlanRepository = widget.actionPlanRepository;
+      _actionFollowUpRepository = widget.actionFollowUpRepository;
     } else if (AppConfig.hasSupabaseCredentials) {
       _authController = AuthController(
         SupabaseAuthRepository(Supabase.instance.client),
@@ -75,6 +81,9 @@ class _AgileKnowledgeAppState extends State<AgileKnowledgeApp> {
         Supabase.instance.client,
       );
       _actionPlanRepository = SupabaseActionPlanRepository(
+        Supabase.instance.client,
+      );
+      _actionFollowUpRepository = SupabaseActionFollowUpRepository(
         Supabase.instance.client,
       );
     }
@@ -157,6 +166,7 @@ class _AgileKnowledgeAppState extends State<AgileKnowledgeApp> {
           occurrenceRepository: _occurrenceRepository,
           fiveWhysRepository: _fiveWhysRepository,
           actionPlanRepository: _actionPlanRepository,
+          actionFollowUpRepository: _actionFollowUpRepository,
         ),
       AppRoutes.history => const HistoryPage(),
       _ => const DashboardPage(),
