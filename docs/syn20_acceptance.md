@@ -6,13 +6,13 @@
 2. Selecione **Registrar causa e plano de ação**.
 3. Revise a causa provável sugerida pela quinta resposta.
 4. Informe ação, responsável, prazo, resultado esperado e indicador.
-5. Salve e confira o resumo do plano.
-6. Abra novamente a ocorrência para consultar o plano já registrado.
+5. Salve o plano como rascunho e siga para a revisão da investigação.
+6. Após concluir a revisão, abra novamente a ocorrência para acompanhar a ação.
 
 ## Critérios verificados
 
-- A causa é inicialmente baseada na quinta resposta, mas permanece editável
-  antes do salvamento.
+- A causa é inicialmente baseada na quinta resposta e permanece editável
+  enquanto a investigação estiver em revisão.
 - A interface informa que a causa é uma hipótese da equipe e não uma certeza do
   sistema.
 - Todos os campos e o prazo são obrigatórios.
@@ -20,8 +20,11 @@
 - Ocorrência, investigação, causa e ação permanecem vinculadas no banco.
 - Somente investigações concluídas aceitam um plano.
 - Existe somente um plano por ocorrência neste MVP.
-- O registro muda a ocorrência para o status **Ação planejada**.
-- RLS restringe leitura e criação ao usuário autenticado proprietário.
+- O salvamento cria um plano com status **Em revisão** e mantém a ocorrência
+  **Em investigação**.
+- Somente a conclusão integral descrita na SYN-21 muda a ocorrência para
+  **Ação planejada**.
+- RLS restringe leitura, criação e edição ao usuário autenticado proprietário.
 
 ## Verificação automatizada
 
@@ -31,6 +34,7 @@ flutter test --no-pub
 ```
 
 Os testes cobrem hipótese sugerida, bloqueio da investigação incompleta,
-validação, vínculo, salvamento, retomada sem duplicação e acesso direto. A
-migração necessária é
-`supabase/migrations/202611230002_create_action_plans.sql`.
+validação, vínculo, salvamento, edição do rascunho, retomada sem duplicação e
+acesso direto. As migrações relacionadas são
+`supabase/migrations/202611230002_create_action_plans.sql` e
+`supabase/migrations/202611240001_review_and_conclude_investigations.sql`.

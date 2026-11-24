@@ -7,6 +7,7 @@ abstract final class AppRoutes {
   static const newOccurrence = '/occurrences/new';
   static const occurrenceDetail = '/occurrences/detail';
   static const investigations = '/investigations';
+  static const investigationReview = '/investigations/review';
   static const actions = '/actions';
   static const history = '/history';
 }

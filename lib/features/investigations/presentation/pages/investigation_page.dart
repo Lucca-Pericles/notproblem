@@ -92,7 +92,7 @@ class _InvestigationPageState extends State<InvestigationPage> {
 
   void _applyInvestigation(FiveWhysInvestigation investigation) {
     _investigation = investigation;
-    _reviewing = investigation.isReadyForReview;
+    _reviewing = investigation.isReadyForReview && !investigation.isCompleted;
     _stepIndex =
         investigation.currentStep > 5 ? 4 : investigation.currentStep - 1;
     _answerController.text = investigation.answers[_stepIndex] ?? '';
@@ -154,8 +154,8 @@ class _InvestigationPageState extends State<InvestigationPage> {
         ),
       );
     }
-    if (_investigation!.isCompleted) return _buildCompleted();
     if (_reviewing) return _buildReview();
+    if (_investigation!.isCompleted) return _buildCompleted();
     return _buildQuestion();
   }
 
@@ -311,6 +311,16 @@ class _InvestigationPageState extends State<InvestigationPage> {
                       icon: const Icon(Icons.task_alt_rounded),
                       label: const Text('Registrar causa e plano de ação'),
                     ),
+                    if (_occurrence!.status != OccurrenceStatus.actionPlanned &&
+                        _occurrence!.status != OccurrenceStatus.completed) ...[
+                      const SizedBox(height: AppSpacing.sm),
+                      OutlinedButton.icon(
+                        key: const Key('editFiveWhysAnswers'),
+                        onPressed: _editCompletedAnswers,
+                        icon: const Icon(Icons.edit_outlined),
+                        label: const Text('Editar respostas'),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -417,6 +427,7 @@ class _InvestigationPageState extends State<InvestigationPage> {
         investigationId: _investigation!.id,
         answers: answers,
       ),
+      closeReview: true,
     );
   }
 
@@ -430,12 +441,16 @@ class _InvestigationPageState extends State<InvestigationPage> {
   Future<void> _runReviewSave(
     Future<FiveWhysInvestigation> Function() operation, {
     String? successMessage,
+    bool closeReview = false,
   }) async {
     setState(() => _saving = true);
     try {
       final updated = await operation();
       if (!mounted) return;
-      setState(() => _investigation = updated);
+      setState(() {
+        _investigation = updated;
+        if (closeReview) _reviewing = false;
+      });
       if (successMessage != null) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(successMessage)));
@@ -445,6 +460,11 @@ class _InvestigationPageState extends State<InvestigationPage> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  void _editCompletedAnswers() {
+    _prepareReviewControllers(_investigation!.answers);
+    setState(() => _reviewing = true);
   }
 
   String _reviewQuestion(int index) {

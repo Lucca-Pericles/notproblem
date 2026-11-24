@@ -117,7 +117,9 @@ void main() {
     expect(actions.lastCreated!.occurrenceId, occurrence.id);
     expect(actions.lastCreated!.investigationId, 'investigation-1');
     expect(actions.lastCreated!.responsible, 'Marina');
-    expect(find.text('Plano de ação registrado'), findsOneWidget);
+    expect(find.text('Plano em revisão'), findsOneWidget);
+    expect(
+        find.byKey(const Key('investigationReviewFromAction')), findsOneWidget);
   });
 
   testWidgets('plano existente abre no resumo sem criar duplicação',
@@ -141,6 +143,62 @@ void main() {
     expect(find.text('Plano de ação registrado'), findsOneWidget);
     expect(find.byKey(const Key('actionPlanSubmit')), findsNothing);
     expect(actions.createCalls, 0);
+  });
+
+  testWidgets('plano em revisão pode ser editado antes da conclusão',
+      (tester) async {
+    final actions = FakeActionPlanRepository()
+      ..current = ActionPlan(
+        id: 'action-1',
+        occurrenceId: occurrence.id,
+        investigationId: 'investigation-1',
+        probableCause: 'Não havia uma lista de verificação.',
+        action: 'Definir uma lista de verificação antes da Sprint.',
+        responsible: 'Marina',
+        dueDate: DateTime(2026, 12, 10),
+        expectedResult: 'Revisões iniciadas em até um dia.',
+        indicator: 'Tempo até a primeira revisão',
+        status: ActionPlanStatus.draft,
+      );
+
+    await _openActionPlan(tester, occurrence, actions);
+
+    expect(find.byKey(const Key('actionDescription')), findsOneWidget);
+    expect(find.text('Plano em revisão'), findsOneWidget);
+    expect(
+        find.byKey(const Key('investigationReviewFromAction')), findsOneWidget);
+  });
+
+  testWidgets('salva alterações pendentes antes de abrir a revisão',
+      (tester) async {
+    final actions = FakeActionPlanRepository()
+      ..current = ActionPlan(
+        id: 'action-1',
+        occurrenceId: occurrence.id,
+        investigationId: 'investigation-1',
+        probableCause: 'Não havia uma lista de verificação.',
+        action: 'Definir uma lista de verificação antes da Sprint.',
+        responsible: 'Marina',
+        dueDate: DateTime(2026, 12, 10),
+        expectedResult: 'Revisões iniciadas em até um dia.',
+        indicator: 'Tempo até a primeira revisão',
+        status: ActionPlanStatus.draft,
+      );
+    await _openActionPlan(tester, occurrence, actions);
+
+    await tester.enterText(
+      find.byKey(const Key('actionDescription')),
+      'Revisar a lista no início da Sprint.',
+    );
+    await tester.ensureVisible(
+      find.byKey(const Key('investigationReviewFromAction')),
+    );
+    await tester.tap(find.byKey(const Key('investigationReviewFromAction')));
+    await tester.pumpAndSettle();
+
+    expect(actions.updateCalls, 1);
+    expect(find.text('Revisar e concluir a investigação'), findsOneWidget);
+    expect(find.text('Revisar a lista no início da Sprint.'), findsOneWidget);
   });
 
   testWidgets('acesso direto orienta a escolher uma ocorrência',
@@ -326,6 +384,7 @@ class FakeActionPlanRepository implements ActionPlanRepository {
   ActionPlan? current;
   NewActionPlan? lastCreated;
   int createCalls = 0;
+  int updateCalls = 0;
 
   @override
   Future<ActionPlan?> findByOccurrence(String occurrenceId) async => current;
@@ -344,6 +403,46 @@ class FakeActionPlanRepository implements ActionPlanRepository {
       dueDate: plan.dueDate,
       expectedResult: plan.expectedResult.trim(),
       indicator: plan.indicator.trim(),
+      status: ActionPlanStatus.draft,
+    );
+    return current!;
+  }
+
+  @override
+  Future<ActionPlan> updateDraft({
+    required String planId,
+    required NewActionPlan plan,
+  }) async {
+    updateCalls++;
+    lastCreated = plan;
+    current = ActionPlan(
+      id: planId,
+      occurrenceId: plan.occurrenceId,
+      investigationId: plan.investigationId,
+      probableCause: plan.probableCause.trim(),
+      action: plan.action.trim(),
+      responsible: plan.responsible.trim(),
+      dueDate: plan.dueDate,
+      expectedResult: plan.expectedResult.trim(),
+      indicator: plan.indicator.trim(),
+      status: ActionPlanStatus.draft,
+    );
+    return current!;
+  }
+
+  @override
+  Future<ActionPlan> conclude(String occurrenceId) async {
+    final value = current!;
+    current = ActionPlan(
+      id: value.id,
+      occurrenceId: value.occurrenceId,
+      investigationId: value.investigationId,
+      probableCause: value.probableCause,
+      action: value.action,
+      responsible: value.responsible,
+      dueDate: value.dueDate,
+      expectedResult: value.expectedResult,
+      indicator: value.indicator,
       status: ActionPlanStatus.planned,
     );
     return current!;

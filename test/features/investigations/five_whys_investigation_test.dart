@@ -110,7 +110,7 @@ void main() {
     expect(find.byKey(const Key('actionPlanFromFiveWhys')), findsOneWidget);
   });
 
-  testWidgets('contexto fica bloqueado após concluir os 5 Porquês',
+  testWidgets('contexto e respostas continuam editáveis durante a revisão',
       (tester) async {
     final investigations = FakeFiveWhysRepository(
       initialAnswers: const [
@@ -137,15 +137,53 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('editContext')), findsNothing);
+    expect(find.byKey(const Key('editContext')), findsOneWidget);
     expect(find.byKey(const Key('openFiveWhys')), findsOneWidget);
     expect(find.text('Ver análise dos 5 Porquês'), findsOneWidget);
-    expect(
-      find.text(
-        'A análise foi concluída e o contexto não pode mais ser editado.',
-      ),
-      findsOneWidget,
+
+    await tester.tap(find.byKey(const Key('openFiveWhys')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('editFiveWhysAnswers')), findsOneWidget);
+  });
+
+  testWidgets('investigação concluída bloqueia correções anteriores',
+      (tester) async {
+    final investigations = FakeFiveWhysRepository(
+      initialAnswers: const [
+        'Resposta 1',
+        'Resposta 2',
+        'Resposta 3',
+        'Resposta 4',
+        'Resposta 5',
+      ],
     );
+    investigations.current = investigations.current.asCompleted();
+    final finalized = Occurrence(
+      id: occurrence.id,
+      title: occurrence.title,
+      project: occurrence.project,
+      occurredOn: occurrence.occurredOn,
+      context: occurrence.context,
+      impact: occurrence.impact,
+      status: OccurrenceStatus.actionPlanned,
+    );
+
+    await tester.pumpWidget(
+      AgileKnowledgeApp(
+        authRepository: FakeConfirmedAuthRepository(),
+        occurrenceRepository: FakeOccurrenceRepository(finalized),
+        fiveWhysRepository: investigations,
+      ),
+    );
+    final context = tester.element(find.byType(Scaffold).first);
+    Navigator.of(context).pushNamed(
+      AppRoutes.occurrenceDetail,
+      arguments: finalized.id,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('editContext')), findsNothing);
+    expect(find.textContaining('não pode mais ser editado'), findsOneWidget);
   });
 }
 

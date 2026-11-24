@@ -19,6 +19,7 @@ import '../features/history/presentation/pages/history_page.dart';
 import '../features/investigations/data/supabase_five_whys_repository.dart';
 import '../features/investigations/domain/five_whys_repository.dart';
 import '../features/investigations/presentation/pages/investigation_page.dart';
+import '../features/investigations/presentation/pages/investigation_review_page.dart';
 import '../features/occurrences/presentation/pages/new_occurrence_page.dart';
 import '../features/occurrences/presentation/pages/occurrence_detail_page.dart';
 import '../features/occurrences/presentation/pages/occurrences_page.dart';
@@ -144,6 +145,12 @@ class _AgileKnowledgeAppState extends State<AgileKnowledgeApp> {
           occurrenceId: settings.arguments as String? ?? '',
           occurrenceRepository: _occurrenceRepository,
           fiveWhysRepository: _fiveWhysRepository,
+        ),
+      AppRoutes.investigationReview => InvestigationReviewPage(
+          occurrenceId: settings.arguments as String? ?? '',
+          occurrenceRepository: _occurrenceRepository,
+          fiveWhysRepository: _fiveWhysRepository,
+          actionPlanRepository: _actionPlanRepository,
         ),
       AppRoutes.actions => ActionFollowUpPage(
           occurrenceId: settings.arguments as String? ?? '',

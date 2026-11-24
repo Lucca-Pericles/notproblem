@@ -1,4 +1,5 @@
 enum ActionPlanStatus {
+  draft('draft', 'Em revisão'),
   planned('planned', 'Planejada');
 
   const ActionPlanStatus(this.value, this.label);
@@ -9,7 +10,7 @@ enum ActionPlanStatus {
   static ActionPlanStatus fromValue(String value) =>
       ActionPlanStatus.values.firstWhere(
         (status) => status.value == value,
-        orElse: () => ActionPlanStatus.planned,
+        orElse: () => ActionPlanStatus.draft,
       );
 }
 
@@ -37,6 +38,8 @@ class ActionPlan {
   final String expectedResult;
   final String indicator;
   final ActionPlanStatus status;
+
+  bool get isFinalized => status == ActionPlanStatus.planned;
 }
 
 class NewActionPlan {

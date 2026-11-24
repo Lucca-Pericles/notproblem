@@ -99,6 +99,8 @@ class _ActionFollowUpPageState extends State<ActionFollowUpPage> {
         _loading = false;
         if (plan == null && investigation?.isCompleted == true) {
           _cause.text = investigation!.answers[4] ?? '';
+        } else if (plan != null && !plan.isFinalized) {
+          _populatePlan(plan);
         }
       });
     } catch (_) {
@@ -146,7 +148,7 @@ class _ActionFollowUpPageState extends State<ActionFollowUpPage> {
     }
     if (_occurrence == null) return _buildMissingOccurrence();
     if (_investigation?.isCompleted != true) return _buildIncomplete();
-    if (_plan != null) return _buildSummary(_plan!);
+    if (_plan?.isFinalized == true) return _buildSummary(_plan!);
     return _buildForm();
   }
 
@@ -193,6 +195,12 @@ class _ActionFollowUpPageState extends State<ActionFollowUpPage> {
   Widget _buildForm() {
     return Column(
       children: [
+        if (_plan != null) ...[
+          _DraftNotice(
+            onReview: _saving ? null : _saveAndReview,
+          ),
+          const SizedBox(height: AppSpacing.lg),
+        ],
         const _HypothesisNotice(),
         const SizedBox(height: AppSpacing.lg),
         LayoutBuilder(
@@ -274,7 +282,7 @@ class _ActionFollowUpPageState extends State<ActionFollowUpPage> {
             _label('Prazo'),
             FormField<DateTime>(
               key: _dateFieldKey,
-              validator: (_) => _dueDate == null ? 'Informe o prazo.' : null,
+              validator: _validateDueDate,
               builder: (field) => Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -335,7 +343,9 @@ class _ActionFollowUpPageState extends State<ActionFollowUpPage> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.check_rounded),
-                label: const Text('Salvar plano de ação'),
+                label: Text(
+                  _plan == null ? 'Salvar plano de ação' : 'Salvar alterações',
+                ),
               ),
             ),
           ],
@@ -417,7 +427,8 @@ class _ActionFollowUpPageState extends State<ActionFollowUpPage> {
     final today = saoPauloToday();
     final value = await showDatePicker(
       context: context,
-      initialDate: _dueDate ?? today,
+      initialDate:
+          _dueDate != null && !_dueDate!.isBefore(today) ? _dueDate! : today,
       firstDate: today,
       lastDate: DateTime(today.year + 5, today.month, today.day),
     );
@@ -427,25 +438,54 @@ class _ActionFollowUpPageState extends State<ActionFollowUpPage> {
     }
   }
 
-  Future<void> _save() async {
+  Future<void> _save() async => _persist();
+
+  Future<void> _saveAndReview() async {
+    final saved = await _persist(showSuccessMessage: false);
+    if (saved == null || !mounted) return;
+    await Navigator.of(context).pushNamed(
+      AppRoutes.investigationReview,
+      arguments: _occurrence!.id,
+    );
+    if (mounted) await _load();
+  }
+
+  Future<ActionPlan?> _persist({bool showSuccessMessage = true}) async {
     FocusScope.of(context).unfocus();
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) return null;
     setState(() => _saving = true);
     try {
-      final plan = await widget.actionPlanRepository!.create(
-        NewActionPlan(
-          occurrenceId: _occurrence!.id,
-          investigationId: _investigation!.id,
-          probableCause: _cause.text,
-          action: _action.text,
-          responsible: _responsible.text,
-          dueDate: _dueDate!,
-          expectedResult: _expectedResult.text,
-          indicator: _indicator.text,
-        ),
+      final values = NewActionPlan(
+        occurrenceId: _occurrence!.id,
+        investigationId: _investigation!.id,
+        probableCause: _cause.text,
+        action: _action.text,
+        responsible: _responsible.text,
+        dueDate: _dueDate!,
+        expectedResult: _expectedResult.text,
+        indicator: _indicator.text,
       );
-      if (!mounted) return;
-      setState(() => _plan = plan);
+      final plan = _plan == null
+          ? await widget.actionPlanRepository!.create(values)
+          : await widget.actionPlanRepository!.updateDraft(
+              planId: _plan!.id,
+              plan: values,
+            );
+      if (!mounted) return null;
+      setState(() {
+        _plan = plan;
+        _populatePlan(plan);
+      });
+      if (showSuccessMessage) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Plano salvo. Revise a investigação para concluí-la.',
+            ),
+          ),
+        );
+      }
+      return plan;
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -454,9 +494,20 @@ class _ActionFollowUpPageState extends State<ActionFollowUpPage> {
           ),
         );
       }
+      return null;
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  String? _validateDueDate(DateTime? _) {
+    final value = _dueDate;
+    if (value == null) return 'Informe o prazo.';
+    final date = DateTime(value.year, value.month, value.day);
+    if (date.isBefore(saoPauloToday())) {
+      return 'Escolha uma data a partir de hoje.';
+    }
+    return null;
   }
 
   String? Function(String?) _required(String message, int maxLength) =>
@@ -466,6 +517,15 @@ class _ActionFollowUpPageState extends State<ActionFollowUpPage> {
         if (length > maxLength) return 'Use no máximo $maxLength caracteres.';
         return null;
       };
+
+  void _populatePlan(ActionPlan plan) {
+    _cause.text = plan.probableCause;
+    _action.text = plan.action;
+    _responsible.text = plan.responsible;
+    _dueDate = plan.dueDate;
+    _expectedResult.text = plan.expectedResult;
+    _indicator.text = plan.indicator;
+  }
 
   Widget _label(String value) => Padding(
         padding: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -514,6 +574,47 @@ class _HypothesisNotice extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DraftNotice extends StatelessWidget {
+  const _DraftNotice({required this.onReview});
+
+  final VoidCallback? onReview;
+
+  @override
+  Widget build(BuildContext context) {
+    return SectionCard(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.rate_review_outlined, color: AppColors.primary),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Plano em revisão',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                const Text(
+                  'Você ainda pode corrigir o contexto, as respostas e o plano antes de concluir.',
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          FilledButton.icon(
+            key: const Key('investigationReviewFromAction'),
+            onPressed: onReview,
+            icon: const Icon(Icons.fact_check_outlined),
+            label: const Text('Revisar investigação'),
           ),
         ],
       ),

@@ -92,8 +92,8 @@ class _OccurrenceDetailPageState extends State<OccurrenceDetailPage> {
             );
           }
           final fiveWhysCompleted = snapshot.data?.isCompleted ?? false;
-          final locked =
-              item.status == OccurrenceStatus.completed || fiveWhysCompleted;
+          final locked = item.status == OccurrenceStatus.actionPlanned ||
+              item.status == OccurrenceStatus.completed;
           if (locked) {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -133,13 +133,24 @@ class _OccurrenceDetailPageState extends State<OccurrenceDetailPage> {
                 key: const Key('openFiveWhys'),
                 onPressed: () => _openFiveWhys(item),
                 icon: const Icon(Icons.account_tree_outlined),
-                label: const Text('Abrir análise dos 5 Porquês'),
+                label: Text(
+                  fiveWhysCompleted
+                      ? 'Ver análise dos 5 Porquês'
+                      : 'Abrir análise dos 5 Porquês',
+                ),
               ),
               OutlinedButton(
                 key: const Key('editContext'),
                 onPressed: () => _edit(item),
                 child: const Text('Editar contexto'),
               ),
+              if (fiveWhysCompleted)
+                OutlinedButton.icon(
+                  key: const Key('openActionPlan'),
+                  onPressed: () => _openActionPlan(item),
+                  icon: const Icon(Icons.task_alt_rounded),
+                  label: const Text('Causa e plano de ação'),
+                ),
             ],
           );
         },

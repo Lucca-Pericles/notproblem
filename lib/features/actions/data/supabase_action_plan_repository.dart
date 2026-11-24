@@ -21,16 +21,7 @@ class SupabaseActionPlanRepository implements ActionPlanRepository {
 
   @override
   Future<ActionPlan> create(NewActionPlan plan) async {
-    final values = {
-      'occurrence_id': plan.occurrenceId,
-      'investigation_id': plan.investigationId,
-      'probable_cause': _text(plan.probableCause, 4000),
-      'action': _text(plan.action, 4000),
-      'responsible': _text(plan.responsible, 120),
-      'due_date': _dateOnly(_validDueDate(plan.dueDate)),
-      'expected_result': _text(plan.expectedResult, 4000),
-      'indicator': _text(plan.indicator, 500),
-    };
+    final values = _values(plan, includeReferences: true);
 
     try {
       final row =
@@ -43,6 +34,50 @@ class SupabaseActionPlanRepository implements ActionPlanRepository {
       return existing;
     }
   }
+
+  @override
+  Future<ActionPlan> updateDraft({
+    required String planId,
+    required NewActionPlan plan,
+  }) async {
+    final row = await _client
+        .from('action_plans')
+        .update(_values(plan))
+        .eq('id', planId)
+        .eq('status', ActionPlanStatus.draft.value)
+        .select()
+        .maybeSingle();
+    if (row == null) {
+      throw StateError('O plano de ação não pode ser atualizado.');
+    }
+    return _fromRow(row);
+  }
+
+  @override
+  Future<ActionPlan> conclude(String occurrenceId) async {
+    final row = await _client.rpc(
+      'conclude_investigation',
+      params: {'p_occurrence_id': occurrenceId},
+    ).single();
+    return _fromRow(row);
+  }
+
+  Map<String, dynamic> _values(
+    NewActionPlan plan, {
+    bool includeReferences = false,
+  }) =>
+      {
+        if (includeReferences) ...{
+          'occurrence_id': plan.occurrenceId,
+          'investigation_id': plan.investigationId,
+        },
+        'probable_cause': _text(plan.probableCause, 4000),
+        'action': _text(plan.action, 4000),
+        'responsible': _text(plan.responsible, 120),
+        'due_date': _dateOnly(_validDueDate(plan.dueDate)),
+        'expected_result': _text(plan.expectedResult, 4000),
+        'indicator': _text(plan.indicator, 500),
+      };
 
   String _text(String value, int maxLength) {
     final normalized = value.trim();
